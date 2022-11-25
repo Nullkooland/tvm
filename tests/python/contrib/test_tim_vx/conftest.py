@@ -14,17 +14,24 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-# pylint: disable=wildcard-import
-"""Contrib modules."""
-from .register import get_pattern_table, register_pattern_table
 
-from .arm_compute_lib import *
-from .dnnl import *
-from .bnns import *
-from .coreml import *
-from .ethosn import *
-from .libtorch import *
-from .tensorrt import *
-from .cutlass import *
-from .clml import *
-from .tim_vx import *
+"""Session scoped fixtures for TIM-VX tests."""
+
+from tvm import rpc
+import pytest
+import os
+
+
+@pytest.fixture(scope="session", name="remote")
+def get_remote() -> rpc.RPCSession:
+    """Get a remote RPC session for testing.
+
+    Returns:
+        rpc.RPCSession: 
+        A connected rpc session if remote RPC host is given;
+        A local session if not.
+    """
+    # Read remote RPC server address from environment variables.
+    rpc_host = os.environ.get("RPC_HOST")
+    rpc_port = int(os.environ.get("RPC_PORT") or 0)
+    return rpc.connect(rpc_host, rpc_port) if rpc_host else rpc.LocalSession()

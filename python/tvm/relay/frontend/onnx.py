@@ -4490,6 +4490,160 @@ class QLinearMatMul(OnnxOpConverter):
         return y
 
 
+class QGemm(OnnxOpConverter):
+    """
+    Operator converter for QGemm from Microsoft onnxruntime contrib opset.
+
+    Limitations:
+    - Only supports alpha == 1.0.
+    - Only supports 2D input tensors.
+    - Only supports output type is uint8/int8.
+    - Not guaranteed to meet the integer-overflow behavior stipulated in the
+      ONNX documentation for this operator.
+
+    """
+
+    @classmethod
+    def _impl_v10(cls, inputs, attr, params):
+        # Some of the ops used below take scalar-like inputs, and may require either
+        # of the following:
+        #
+        # - the input is Const node (not merely an expression that *could* be reduced
+        #   to a single Const at graph-compilation time)
+        #
+        # - the input has a specific dtype
+        #
+        # This function attempts to present 'x' in a form that meets both of those
+        # requirements.
+        def try_resolve_to_const(x, dtype_override=None):
+            x2 = try_resolve_var_to_const(x, params)
+            num_elem = np.prod(infer_shape(x))
+            if num_elem == 1:
+                x2 = ensure_scalar_shape(x2)
+            x_dtype = infer_type(x).checked_type.dtype
+            if (dtype_override is not None) and (dtype_override != x_dtype):
+                x2 = _op.cast(x2, dtype_override)
+            x3 = fold_constant(x2)
+            return x3
+
+        # Unpack the inputs and obtain some type info.
+        if len(inputs) == 8:
+            a, a_scale, a_zp, b, b_scale, b_zp, y_scale, y_zp = inputs
+            c = None
+        elif len(inputs) == 9:
+            a, a_scale, a_zp, b, b_scale, b_zp, c, y_scale, y_zp = inputs
+        else:
+            raise tvm.error.OpNotImplemented(
+                "QGemm importer currently does not supports output dtype is float32, so y_scale, y_zp should be provided"
+            ) 
+
+        a_type = infer_type(a).checked_type  # 'TA' in ONNX doc for this op.
+        a_scale_type = infer_type(a_scale).checked_type
+        a_zp_type = infer_type(a_zp).checked_type
+
+        b_type = infer_type(b).checked_type  # 'TB' in ONNX doc for this op.
+        b_scale_type = infer_type(b_scale).checked_type
+        b_zp_type = infer_type(b_zp).checked_type
+
+        if c is not None:
+            c_type = infer_type(c).checked_type  # 'TC' in ONNX doc for this op.
+            assert c_type.dtype == "int32"
+
+        y_scale_type = infer_type(y_scale).checked_type
+        y_zp_type = infer_type(y_zp).checked_type  # 'TYZ' in ONNX doc for this op.
+
+        a_shape = infer_shape(a)
+        b_shape = infer_shape(b)
+
+        # Verify type assumptions, based on the ONNX doc for this op.
+        assert a_type.dtype in ["int8", "uint8"]
+        assert a_scale_type.dtype == "float32"
+        assert a_zp_type.dtype == a_type.dtype
+
+        assert b_type.dtype in ["int8", "uint8"]
+        assert b_scale_type.dtype == "float32"
+        assert b_zp_type.dtype == b_type.dtype
+
+        assert y_scale_type.dtype == "float32"
+        assert y_zp_type.dtype in ["int8", "uint8"]
+
+        # TODO: relax this limitation in a future version of this importer.
+        a_rank = len(a_shape)
+        b_rank = len(b_shape)
+        if (a_rank != 2) or (b_rank != 2): 
+            raise tvm.error.OpNotImplemented(
+                "QGemm importer currently requires both 'a' and 'b' tensors to be 2D, but"
+                " rank(a)={}, rank(b)={}".format(a_rank, b_rank)
+            )
+
+        # _qnn.op.dense requires the zero-point values to have dtype int32.
+        a_scale = try_resolve_to_const(a_scale)
+        a_zp = try_resolve_to_const(a_zp, "int32")
+
+        b_scale = try_resolve_to_const(b_scale)
+        b_zp = try_resolve_to_const(b_zp, "int32")
+
+        y_scale = try_resolve_to_const(y_scale)
+        y_zp = try_resolve_to_const(y_zp, "int32")
+
+        alpha = float(attr.get("alpha", 1.0))
+        transA = int(attr.get("transA", 0))
+        transB = int(attr.get("transB", 0))
+
+        # get number of channels.
+        channels = infer_channels(b, not transB)
+
+        if transA:
+            a = _op.transpose(a, axes=(1, 0))
+        if not transB:
+            b = _op.transpose(b, axes=(1, 0))
+        if alpha != 1.0:
+            raise tvm.error.OpAttributeUnImplemented(
+                f"QGemm importer currently only supports alpha == 1.0, got alpha == {alpha}"
+            )
+
+        qgemm_result = _qnn.op.dense(
+            a,
+            b,
+            a_zp,
+            b_zp,
+            a_scale,
+            b_scale,
+            channels,
+            "int32",
+        )
+        
+        if c is not None:
+            qgemm_result = _op.nn.bias_add(qgemm_result, c)
+
+        c_scale = fold_constant(_op.multiply(a_scale, b_scale))
+        c_zp = _op.const(0, dtype="int32")
+
+        # requantize requires y_scale to be constant,
+        # if y_scale is not constant, doing dequantize -> quantize.
+        if isinstance(y_scale, _expr.Constant):
+            y = _qnn.op.requantize(
+                qgemm_result,
+                c_scale,
+                c_zp,
+                y_scale,
+                y_zp,
+                axis=-1,
+                rounding="TONEAREST",
+                out_dtype=y_zp_type.dtype,
+            )
+        else:
+            qgemm_result_dq = _qnn.op.dequantize(
+                qgemm_result, c_scale, c_zp, axis=0
+            )
+
+            y = _qnn.op.quantize(
+                qgemm_result_dq, y_scale, y_zp, axis=0, out_dtype=y_zp_type.dtype
+            )
+
+        return y
+
+
 class MatMulInteger(OnnxOpConverter):
     """Operator converter for MatMulInteger."""
 
@@ -5475,6 +5629,7 @@ def _get_convert_map(opset):
         "QLinearConcat": QLinearConcat.get_converter(opset),
         "QLinearAdd": QLinearAdd.get_converter(opset),
         "QLinearMatMul": QLinearMatMul.get_converter(opset),
+        "QGemm": QGemm.get_converter(opset),
         "QLinearMul": QLinearMul.get_converter(opset),
         "QLinearSigmoid": QLinearSigmoid.get_converter(opset),
         "ConvInteger": ConvInteger.get_converter(opset),

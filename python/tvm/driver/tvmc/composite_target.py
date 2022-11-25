@@ -29,7 +29,7 @@ from tvm.relay.op.contrib.cmsisnn import partition_for_cmsisnn
 from tvm.relay.op.contrib.ethosu import partition_for_ethosu
 from tvm.relay.op.contrib.bnns import partition_for_bnns
 from tvm.relay.op.contrib.vitis_ai import partition_for_vitis_ai
-
+from tvm.relay.op.contrib import partition_for_tim_vx
 
 from tvm.driver.tvmc import TVMCException
 
@@ -72,6 +72,10 @@ REGISTERED_CODEGEN = {
         "config_key": "relay.ext.vitis_ai.options",
         "pass_pipeline": partition_for_vitis_ai,
     },
+    "tim-vx": {
+        "config_key": "relay.ext.tim-vx.options",
+        "pass_pipeline": partition_for_tim_vx,
+    },
     # Deprecated in favour of "ethos-n".
     "ethos-n78": {
         "config_key": "relay.ext.ethos-n.options",
@@ -113,4 +117,5 @@ def get_codegen_by_target(name):
             )
         return REGISTERED_CODEGEN[name]
     except KeyError:
-        raise TVMCException("Composite target %s is not defined in TVMC." % name)
+        raise TVMCException(
+            "Composite target %s is not defined in TVMC." % name)

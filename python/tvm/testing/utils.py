@@ -980,6 +980,14 @@ requires_corstone300 = Feature(
 # Mark a test as requiring Vitis AI to run
 requires_vitis_ai = Feature("vitis_ai", "Vitis AI", cmake_flag="USE_VITIS_AI")
 
+# Mark a test as requiring TIM-VX to run
+requires_tim_vx = Feature(
+    "tim_vx",
+    "TIM-VX",
+    cmake_flag="USE_TIM_VX",
+    parent_features="llvm"
+)
+
 
 def _cmake_flag_enabled(flag):
     flag = tvm.support.libinfo()[flag]
