@@ -60,11 +60,20 @@ Axis = Optional[Tuple[int, ...] | int]
             1, False, False,  # axis, keepdims, exclude
         ),
         (
-            "uint8", (-1.0, 1.0),  (1, 16, 8, 8), {
+            "uint8", (0, 256),  (1, 16, 8, 8), {
                 "input_scale": relay.const(1 / 255),
                 "input_zero_point": relay.const(128),
                 "output_scale": relay.const(8 / 255),
                 "output_zero_point": relay.const(128),
+            },
+            (2, 3), True, False,  # axes, keepdims, exclude
+        ),
+        (
+            "int8", (-128, 128),  (1, 16, 8, 8), {
+                "input_scale": relay.const(1 / 127),
+                "input_zero_point": relay.const(0),
+                "output_scale": relay.const(1 / 127),
+                "output_zero_point": relay.const(0),
             },
             (2, 3), True, False,  # axes, keepdims, exclude
         ),
@@ -140,15 +149,24 @@ def test_sum(
             1, False, True,  # axis, keepdims, exclude
         ),
         (
-            "uint8", (0, 2),  (1, 8, 16, 16), {},
+            "int16", (0, 100),  (1, 8, 16, 16), {},
             (2, 3), False, False,  # axis, keepdims, exclude
         ),
         (
-            "uint8", (-1.0, 1.0),  (1, 16, 32, 32), {
+            "uint8", (0, 256),  (1, 16, 32, 32), {
                 "input_scale": relay.const(2 / 255),
                 "input_zero_point": relay.const(128),
                 "output_scale": relay.const(2 / 255),
                 "output_zero_point": relay.const(128),
+            },
+            (2, 3), True, False,  # axes, keepdims, exclude
+        ),
+        (
+            "int8", (-128, 128),  (1, 16, 32, 32), {
+                "input_scale": relay.const(1 / 255),
+                "input_zero_point": relay.const(0),
+                "output_scale": relay.const(1 / 255),
+                "output_zero_point": relay.const(0),
             },
             (2, 3), True, False,  # axes, keepdims, exclude
         ),
@@ -172,17 +190,12 @@ def test_mean(
     data = relay.var("input", shape=shape, dtype=dtype)
 
     if qnn_params:
-        call = relay.qnn.op.dequantize(
-            data,
-            input_scale=qnn_params["input_scale"],
-            input_zero_point=qnn_params["input_zero_point"]
+        call = relay.qnn.op.requantize(
+            data, **qnn_params, out_dtype="int32"
         )
         call = relay.mean(call, axis, keep_dims, exclude)
-        call = relay.qnn.op.quantize(
-            call,
-            output_scale=qnn_params["output_scale"],
-            output_zero_point=qnn_params["output_zero_point"],
-            out_dtype=dtype
+        call = relay.qnn.op.requantize(
+            call, **qnn_params, out_dtype=dtype
         )
     else:
         call = relay.mean(data, axis, keep_dims, exclude)
@@ -199,7 +212,9 @@ def test_mean(
 
     ref_outputs = build_and_run(call, inputs, build_for_tim_vx=False)
 
-    atol, rtol = (1, 1.0 / np.iinfo(dtype).max) if qnn_params else (1e-6, 1e-6)
+    atol, rtol = (1, 1.0 / np.iinfo(dtype).max) if np.issubdtype(
+        np.dtype(dtype), np.integer
+    ) else (1e-6, 1e-6)
     verify(tim_vx_outputs, ref_outputs, atol, rtol)
 
 
