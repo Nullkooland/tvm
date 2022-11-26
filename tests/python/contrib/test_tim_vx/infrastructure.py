@@ -76,11 +76,12 @@ def build_module(
     else:
         ir_mod = expr_or_ir_mod
 
+    npu_target = os.environ.get("VSIMULATOR_CONFIG", "")
     with tvm.transform.PassContext(
         opt_level=3,
         config={
             "relay.ext.tim_vx.options": {
-                "npu_target": "VIP8000NANOSI_PID0XB5",
+                "npu_target": npu_target,
                 "relax_mode": True,
                 "debug_level": 1,
             }
