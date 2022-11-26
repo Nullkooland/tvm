@@ -597,6 +597,18 @@ class TupleOpConverter<ops::Concat> final : public TimVxOpConverter {
   }
 };
 
+/*!
+ * \brief Converter class for where op.
+ * \note Op format: where(condition, x, y) -> output.
+ */
+class WhereConverter final : public TimVxOpConverter {
+ public:
+  TimVxOp Convert(TimVxGraph graph, const CallNode* call, TimVxTensorSpecList& in_tensor_specs,
+                  TimVxTensorSpecList& out_tensor_specs) override {
+    return graph->CreateOperation<ops::Select>();
+  }
+};
+
 /*! \brief QNN op quantization type.  */
 enum class OpQuantFormat {
   NONE,
@@ -1220,6 +1232,7 @@ const TimVxOpConverter::Memo TimVxOpConverter::GetMemo() {
       std::make_unique<QnnWrapper<UnaryOpConverter<ops::Split>, OpQuantFormat::TRANSPARENT>>());
 
   /* Gather-Scatter ops. */
+  memo.emplace("where", std::make_unique<WhereConverter>());
   memo.emplace(
       "take",
       std::make_unique<QnnWrapper<UnaryOpConverter<ops::Gather>, OpQuantFormat::TRANSPARENT>>());
