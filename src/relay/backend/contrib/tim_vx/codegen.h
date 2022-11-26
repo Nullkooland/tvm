@@ -76,16 +76,16 @@ class TimVxGraphBuilder final : private MixedModeVisitor {
 
   /*! \brief The TIM-VX graph for compilation. */
   TimVxGraph graph_;
-  /*! \brief The output op set. */
+  /*! \brief The output Relay Expr set. */
   OpSet output_op_;
-  /*! \brief The op map used for memoization. */
+  /*! \brief The memo of Relay Expr to TIM-VX op. */
   OpMemo op_memo_;
-  /*! \brief The tensor spec map used for memoization. */
+  /*! \brief The memo of Relay Expr to TIM-VX tensor spec. */
   TensorSpecMemo tensor_spec_memo_;
-  /*! \brief The tuple tensor specs map used for memoization. */
+  /*! \brief The memo of Relay tuple-like Expr to list of TIM-VX tensor specs. */
   TupleTensorSpecsMemo tuple_tensor_specs_memo_;
 
-  /*! \brief The TVM Relay op -> TIM-VX op converters map. */
+  /*! \brief The TVM Relay op -> TIM-VX op converters memo. */
   static const TimVxOpConverter::Memo OP_CONVERTERS_MEMO;
 
   /*! \brief Allow TimVxTensorBinder to access private memos. */
@@ -113,15 +113,15 @@ class TimVxTensorBinder final : private MixedModeVisitor {
 
   /*! \brief The TIM-VX graph for compilation. */
   TimVxGraph graph_;
-  /*! \brief The op map used for memoization. */
+  /*! \brief The memo of Relay Expr to TIM-VX op. */
   OpMemo op_memo_;
-  /*! \brief The tensor spec map used for memoization. */
-  const TensorSpecMemo tensor_spec_memo_;
-  /*! \brief The tuple tensor specs map used for memoization. */
-  const TupleTensorSpecsMemo tuple_tensor_specs_memo_;
-  /*! \brief The tensor map used for memoization. */
+  /*! \brief The memo of Relay Expr to TIM-VX tensor spec. */
+  TensorSpecMemo tensor_spec_memo_;
+  /*! \brief The memo of Relay tuple-like Expr to list of TIM-VX tensor specs. */
+  TupleTensorSpecsMemo tuple_tensor_specs_memo_;
+  /*! \brief The memo of Relay Expr to TIM-VX tensor. */
   TensorMemo tensor_memo_;
-  /*! \brief The tuple tensors map used for memoization. */
+  /*! \brief The memo of Relay tuple-like Expr to list of TIM-VX tensors. */
   TupleTensorsMemo tuple_tensors_memo_;
 };
 

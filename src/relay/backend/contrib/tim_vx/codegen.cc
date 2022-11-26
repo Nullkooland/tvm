@@ -243,13 +243,6 @@ void TimVxTensorBinder::VisitExpr_(const CallNode* call) {
   // Bind input/output tensors to the op.
   vx_op->BindInputs(in_tensors);
   vx_op->BindOutputs(out_tensors);
-
-  // Put op output tensor(s) into the memo.
-  if (out_tensors.size() > 1) {
-    tuple_tensors_memo_[GetRef<Expr>(call)] = std::move(out_tensors);
-  } else {
-    tensor_memo_[GetRef<Expr>(call)] = std::move(out_tensors[0]);
-  }
 }
 
 TimVxTensorList TimVxTensorBinder::FindOrCreateOpInputTensors(const CallNode* call) {
@@ -257,27 +250,23 @@ TimVxTensorList TimVxTensorBinder::FindOrCreateOpInputTensors(const CallNode* ca
 
   const auto& arg0 = call->args[0];
   if (const auto* tuple_type = arg0->checked_type().as<TupleTypeNode>()) {
-    const auto it = tuple_tensors_memo_.find(arg0);
-    if (it != tuple_tensors_memo_.cend()) {
-      const auto& [_, tuple_tensors] = *it;
-      in_tensors.reserve(tuple_tensors.size());
-      for (const auto& tensor : tuple_tensors) {
-        in_tensors.push_back(tensor);
-      }
+    if (const auto it = tuple_tensors_memo_.find(arg0); it != tuple_tensors_memo_.cend()) {
+      const auto& [_, in_tensors] = *it;
       return in_tensors;
     }
 
-    const auto& tuple_tensor_specs = tuple_tensor_specs_memo_.at(arg0);
-    in_tensors.reserve(tuple_tensor_specs.size());
-
-    for (const auto& item_spec : tuple_tensor_specs) {
-      in_tensors.push_back(graph_->CreateTensor(*item_spec));
+    const auto& in_tuple_specs = tuple_tensor_specs_memo_.at(arg0);
+    in_tensors.reserve(tuple_type->fields.size());
+    for (const auto& field_spec : in_tuple_specs) {
+      in_tensors.push_back(graph_->CreateTensor(*field_spec));
       ;
     }
+
+    tuple_tensors_memo_.emplace(arg0, in_tensors);
   } else {
+    in_tensors.reserve(call->args.size());
     for (const auto& arg : call->args) {
-      const auto it = tensor_memo_.find(arg);
-      if (it != tensor_memo_.cend()) {
+      if (const auto it = tensor_memo_.find(arg); it != tensor_memo_.cend()) {
         const auto& [_, tensor] = *it;
         in_tensors.push_back(tensor);
         continue;
@@ -288,13 +277,17 @@ TimVxTensorList TimVxTensorBinder::FindOrCreateOpInputTensors(const CallNode* ca
         continue;
       }
 
+      std::shared_ptr<tim::vx::Tensor> in_tensor;
       if (const auto* constant = arg.as<ConstantNode>()) {
         ICHECK(arg_spec->attr_ == tim::vx::TensorAttribute::CONSTANT)
             << "Should be a constant TIM-VX tensor";
-        in_tensors.push_back(graph_->CreateTensor(*arg_spec, constant->data->data));
+        in_tensor = graph_->CreateTensor(*arg_spec, constant->data->data);
       } else {
-        in_tensors.push_back(graph_->CreateTensor(*arg_spec));
+        in_tensor = graph_->CreateTensor(*arg_spec);
       }
+
+      tensor_memo_.emplace(arg, in_tensor);
+      in_tensors.push_back(std::move(in_tensor));
     }
   }
 
@@ -303,17 +296,24 @@ TimVxTensorList TimVxTensorBinder::FindOrCreateOpInputTensors(const CallNode* ca
 
 TimVxTensorList TimVxTensorBinder::CreateOpOutputTensors(const CallNode* call) {
   TimVxTensorList out_tensors;
+
   if (call->checked_type()->IsInstance<TupleTypeNode>()) {
-    const auto& tuple_tensor_specs = tuple_tensor_specs_memo_.at(GetRef<Expr>(call));
-    out_tensors.reserve(tuple_tensor_specs.size());
-    for (const auto& item_spec : tuple_tensor_specs) {
+    const auto& out_tuple_specs = tuple_tensor_specs_memo_.at(GetRef<Expr>(call));
+    out_tensors.reserve(out_tuple_specs.size());
+    for (const auto& item_spec : out_tuple_specs) {
       out_tensors.push_back(graph_->CreateTensor(*item_spec));
       ;
     }
+
+    tuple_tensors_memo_.emplace(GetRef<Expr>(call), out_tensors);
   } else {
-    const auto& spec = tensor_spec_memo_.at(GetRef<Expr>(call));
-    out_tensors.push_back(graph_->CreateTensor(*spec));
+    const auto& out_spec = tensor_spec_memo_.at(GetRef<Expr>(call));
+    auto out_tensor = graph_->CreateTensor(*out_spec);
+
+    tensor_memo_.emplace(GetRef<Expr>(call), out_tensor);
+    out_tensors.push_back(std::move(out_tensor));
   }
+
   return out_tensors;
 }
 
