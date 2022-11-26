@@ -275,9 +275,9 @@ def test_clip(
             "output_zero_point": relay.const(32),
         }, 0.2),
         ("int8", (-128, 128), (1024,), {
-            "input_scale": relay.const(2 / 255),
+            "input_scale": relay.const(1 / 127),
             "input_zero_point": relay.const(0),
-            "output_scale": relay.const(1 / 255),
+            "output_scale": relay.const(1 / 127),
             "output_zero_point": relay.const(0),
         }, 0.2),
     ],
@@ -335,9 +335,9 @@ def test_leaky_relu(
             "output_zero_point": relay.const(0),
         }),
         ("int8", (-128, 128), (1024,), {
-            "scale": relay.const(10 / 255),
+            "scale": relay.const(10 / 127),
             "zero_point": relay.const(0),
-            "output_scale": relay.const(2 / 255),
+            "output_scale": relay.const(1 / 127),
             "output_zero_point": relay.const(0),
         }),
     ],

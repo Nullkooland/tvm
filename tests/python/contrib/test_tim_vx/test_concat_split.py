@@ -80,16 +80,16 @@ from typing import Tuple, List, Dict
             "int8", 1,  # dtype, axis
             [
                 ((1, 38, 16, 16), (-128, 128), {
-                 "input_scale": relay.const(1 / 255),
+                 "input_scale": relay.const(1 / 127),
                  "input_zero_point": relay.const(0),
                  }),
                 ((1, 42, 16, 16), (-128, 128), {
-                 "input_scale": relay.const(2 / 255),
+                 "input_scale": relay.const(2 / 127),
                  "input_zero_point": relay.const(0),
                  }),
             ],  # inputs
             {
-                "output_scale": relay.const(2 / 255),
+                "output_scale": relay.const(2 / 127),
                 "output_zero_point": relay.const(0)
             },  # output qnn params
         ),
@@ -159,10 +159,10 @@ def test_concat(
 @pytest.mark.parametrize(
     ("dtype", "val_range", "shape", "axis", "num_stacks"),
     [
-        ("float32", (-1.0, 1.0), (16, 16), 0, 3),
-        ("float32", (-1.0, 1.0), (16, 16), 1, 3),
+        # ("float32", (-1.0, 1.0), (16, 16), 0, 3),
+        # ("float32", (-1.0, 1.0), (16, 16), 1, 3),
         ("float32", (-1.0, 1.0), (16, 16), 2, 3),
-        ("uint8", (0, 256), (3, 24, 24), 0, 16),
+        # ("uint8", (0, 256), (3, 24, 24), 0, 16),
     ]
 )
 def test_stack(

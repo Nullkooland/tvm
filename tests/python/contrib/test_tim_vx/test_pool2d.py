@@ -42,9 +42,9 @@ from typing import Tuple, Dict
             "output_zero_point": relay.const(128),
         }),
         ("int8", (-128, 128), (1, 16, 64, 64), {
-            "input_scale": relay.const(1 / 255),
+            "input_scale": relay.const(1 / 127),
             "input_zero_point": relay.const(0),
-            "output_scale": relay.const(1 / 255),
+            "output_scale": relay.const(1 / 127),
             "output_zero_point": relay.const(0),
         }),
     ]

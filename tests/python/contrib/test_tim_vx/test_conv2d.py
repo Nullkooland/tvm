@@ -132,7 +132,7 @@ def _get_kernel_info(kernel_shape: Sequence[int], kernel_layout: str) -> Tuple[S
             {
                 "input_scale": relay.const(1 / 255),
                 "input_zero_point": relay.const(128),
-                "kernel_scale": relay.const(2 / 255),
+                "kernel_scale": relay.const(1 / 127),
                 "kernel_zero_point": relay.const(0),
                 "output_scale": relay.const(4 / 255),
                 "output_zero_point": relay.const(128),
@@ -148,10 +148,10 @@ def _get_kernel_info(kernel_shape: Sequence[int], kernel_layout: str) -> Tuple[S
         #         "input_scale": relay.const(1 / 255),
         #         "input_zero_point": relay.const(128),
         #         "kernel_scale": relay.const([
-        #             1 / 255,
-        #             2 / 255,
-        #             3 / 255,
-        #             4 / 255,
+        #             1 / 127,
+        #             2 / 127,
+        #             3 / 127,
+        #             4 / 127,
         #         ]),
         #         "kernel_zero_point": relay.const(0),
         #         "output_scale": relay.const(12 / 255),
