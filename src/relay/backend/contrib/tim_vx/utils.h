@@ -75,7 +75,7 @@ inline std::array<uint32_t, 4> ConvertPadding(std::array<uint32_t, 4> tvm_paddin
 
 /*! \brief Convert string to TIM-VX resize type enum. */
 inline tim::vx::ResizeType ConvertResizeType(const std::string_view method) {
-  if (method == "linear") {
+  if (method == "area") {
     return tim::vx::ResizeType::AREA;
   } else if (method == "linear") {
     return tim::vx::ResizeType::BILINEAR;
