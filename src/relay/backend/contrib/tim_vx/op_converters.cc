@@ -253,6 +253,36 @@ class UnaryOpConverter<ops::Transpose> final : public TimVxOpConverter {
 };
 
 /*!
+ * \brief Converter class (fully specialized template) for strided_slice op.
+ * \note Op format: strided_slice(input) -> output.
+ */
+template <>
+class UnaryOpConverter<ops::StridedSlice> final : public TimVxOpConverter {
+ public:
+  TimVxOp Convert(TimVxGraph graph, const CallNode* call, TimVxTensorSpecList& in_tensor_specs,
+                  TimVxTensorSpecList& out_tensor_specs) override {
+    const auto* attrs = call->attrs.as<StridedSliceAttrs>();
+    size_t rank = in_tensor_specs[0]->shape_.size();
+
+    auto tvm_begin = attrs->begin.value();
+    auto tvm_end = attrs->end.value();
+    auto tvm_strides = attrs->strides.value();
+
+    std::vector<int> vx_begin(rank);
+    std::vector<int> vx_end(rank);
+    std::vector<int> vx_strides(rank);
+
+    for (size_t i = 0; i < rank; i++) {
+      vx_begin[rank - i - 1] = static_cast<int>(tvm_begin[i]->value);
+      vx_end[rank - i - 1] = static_cast<int>(tvm_end[i]->value);
+      vx_strides[rank - i - 1] = static_cast<int>(tvm_strides[i]->value);
+    }
+
+    return graph->CreateOperation<ops::StridedSlice>(vx_begin, vx_end, vx_strides, 0, 0, 0);
+  }
+};
+
+/*!
  * \brief Converter class (fully specialized template) for nn.space_to_depth op.
  * \note Op format: nn.space_to_depth(input) -> output.
  */
@@ -261,8 +291,13 @@ class UnaryOpConverter<ops::SpaceToDepth> final : public TimVxOpConverter {
  public:
   TimVxOp Convert(TimVxGraph graph, const CallNode* call, TimVxTensorSpecList& in_tensor_specs,
                   TimVxTensorSpecList& out_tensor_specs) override {
-    const auto* attrs = call->attrs.as<SubPixelAttrs>();
-    std::vector<int> block_size(2, attrs->block_size);
+    std::vector<int> block_size;
+    if (call->op->IsInstance<FunctionNode>()) {
+      block_size = {2, 2};
+    } else {
+      const auto* attrs = call->attrs.as<SubPixelAttrs>();
+      block_size = {attrs->block_size, attrs->block_size};
+    }
 
     return graph->CreateOperation<ops::SpaceToDepth>(block_size);
   }
@@ -1218,7 +1253,14 @@ const TimVxOpConverter::Memo TimVxOpConverter::GetMemo() {
       "transpose",
       std::make_unique<QnnWrapper<UnaryOpConverter<ops::Transpose>, OpQuantFormat::TRANSPARENT>>());
 
+  memo.emplace("strided_slice",
+               std::make_unique<
+                   QnnWrapper<UnaryOpConverter<ops::StridedSlice>, OpQuantFormat::TRANSPARENT>>());
+
   memo.emplace("nn.space_to_depth",
+               std::make_unique<
+                   QnnWrapper<UnaryOpConverter<ops::SpaceToDepth>, OpQuantFormat::TRANSPARENT>>());
+  memo.emplace("nn.space_to_depth_2x2",
                std::make_unique<
                    QnnWrapper<UnaryOpConverter<ops::SpaceToDepth>, OpQuantFormat::TRANSPARENT>>());
 

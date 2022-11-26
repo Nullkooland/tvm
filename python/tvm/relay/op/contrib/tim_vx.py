@@ -517,6 +517,31 @@ def tim_vx_pattern_table():
         pattern = is_tuple([mean, variance])
         return pattern
 
+    def space_to_depth_2x2_pattern():
+        data = wildcard()
+        slices = tuple(
+            is_op("strided_slice")(data).has_attr({
+                "strides": (1, 1, 2, 2)  # type: ignore
+            }) for _ in range(4)
+        )
+        slices = is_tuple(slices)
+        pattern = is_op("concatenate")(slices).has_attr({
+            "axis": 1
+        })
+        return pattern
+
+    def check_space_to_depth_2x2(extract: Call) -> bool:
+        spatial_begins = ((0, 0), (0, 1), (1, 0), (1, 1))
+        for slice, spatial_begin in zip(extract.args[0], spatial_begins):
+            input_shape: Tuple[int, ...] = tuple(
+                slice.args[0].checked_type.shape
+            )
+            begin: Tuple[int, ...] = tuple(slice.attrs.begin)
+            end: Tuple[int, ...] = tuple(slice.attrs.end)
+            if begin[:2] != (0, 0) or begin[2:] != spatial_begin or end != input_shape:
+                return False
+        return True
+
     def qnn_swish_pattern():
         x = wildcard()
         sigmoid = is_op("qnn.sigmoid")(
@@ -598,6 +623,8 @@ def tim_vx_pattern_table():
         ("tim_vx.square", square_pattern()),
         ("tim_vx.reciprocal", reciprocal_pattern(), check_reciprocal),
         ("tim_vx.mean_variance", mean_variance_pattern()),
+        ("tim_vx.nn.space_to_depth_2x2",
+         space_to_depth_2x2_pattern(), check_space_to_depth_2x2),
         ("tim_vx.nn.swish", nn_swish_pattern()),
         ("tim_vx.qnn.swish", qnn_swish_pattern()),
         ("tim_vx.qnn.avg_pool2d", qnn_avg_pool2d_pattern()),
