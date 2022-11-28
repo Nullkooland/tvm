@@ -359,6 +359,48 @@ def test_argreduce(
 @tvm.testing.requires_tim_vx
 @pytest.mark.usefixtures("remote")
 @pytest.mark.parametrize(
+    ("dtype", "val_range", "shape", "k",),
+    [
+        ("float32", (-1.0, 1.0), (256,), 5),
+        ("float16", (-1.0, 1.0), (512,), 128),
+        ("uint8", (0, 256), (1024,), 16),
+        ("uint8", (0, 256), (8, 1024), 5),
+        ("int8", (-128, 128), (1024,), 16),
+    ]
+)
+def test_topk(
+    dtype: str,
+    val_range: ValueRange,
+    shape: Tuple[int, ...],
+    k: int,
+    remote: rpc.RPCSession,
+):
+    inputs: Dict[str, tvm.nd.NDArray] = {
+        "input": tvm.nd.array(
+            np.random.uniform(*val_range, size=shape).astype(dtype)
+        ),
+    }
+    data = relay.var("input", shape=shape, dtype=dtype)
+
+    call = relay.topk(data, k).tuple_value
+
+    tim_vx_outputs = build_and_run(
+        call,
+        inputs,
+        params={},
+        build_for_tim_vx=True,
+        expected_num_cpu_ops=0,
+        expected_num_tim_vx_subgraphs=1,
+        remote=remote
+    )
+
+    ref_outputs = build_and_run(call, inputs, build_for_tim_vx=False)
+    verify(tim_vx_outputs, ref_outputs, 0, 0)
+
+
+@tvm.testing.requires_tim_vx
+@pytest.mark.usefixtures("remote")
+@pytest.mark.parametrize(
     ("dtype", "val_range", "shape"),
     [
         ("float32", (-1.0, 1.0), (1, 8, 32, 32)),

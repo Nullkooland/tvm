@@ -25,6 +25,7 @@
 #include "op_converters.h"
 
 #include <tim/vx/ops.h>
+#include <tvm/relay/attrs/algorithm.h>
 #include <tvm/relay/attrs/image.h>
 #include <tvm/relay/attrs/nn.h>
 #include <tvm/relay/attrs/reduce.h>
@@ -480,6 +481,22 @@ class UnaryOpConverter<ops::ArgMax> final : public TimVxOpConverter {
     int vx_axis = ConvertAxis<int>(attrs->axis[0]->value, rank);
 
     return graph->CreateOperation<ops::ArgMax>(vx_axis);
+  }
+};
+
+/*!
+ * \brief Converter class (fully specialized template) for topk op.
+ * \note Op format: topk(input) -> output.
+ */
+template <>
+class UnaryOpConverter<ops::Topk> final : public TimVxOpConverter {
+ public:
+  TimVxOp Convert(TimVxGraph graph, const CallNode* call, TimVxTensorSpecList& in_tensor_specs,
+                  TimVxTensorSpecList& out_tensor_specs) override {
+    const auto* attrs = call->attrs.as<TopKAttrs>();
+    uint32_t k = static_cast<uint32_t>(attrs->k.value_or(1)->value);
+
+    return graph->CreateOperation<ops::Topk>(k);
   }
 };
 
@@ -1229,6 +1246,7 @@ const TimVxOpConverter::Memo TimVxOpConverter::GetMemo() {
 
   memo.emplace("argmin", std::make_unique<UnaryOpConverter<ops::ArgMin>>());
   memo.emplace("argmax", std::make_unique<UnaryOpConverter<ops::ArgMax>>());
+  memo.emplace("topk", std::make_unique<UnaryOpConverter<ops::Topk>>());
 
   /* Neighborhood ops. */
   memo.emplace(

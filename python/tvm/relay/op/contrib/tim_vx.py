@@ -707,6 +707,7 @@ _register_external_op_helper("all")
 _register_external_op_helper("any")
 _register_external_op_helper("argmin")
 _register_external_op_helper("argmax")
+_register_external_op_helper("topk")
 
 # Neighborhood ops.
 _register_external_op_helper("nn.max_pool2d")
