@@ -111,22 +111,37 @@ def _get_kernel_info(kernel_shape: Sequence[int], kernel_layout: str) -> Tuple[S
         ),
         (
             "uint8", (0, 256), (1, 3, 128, 128), "NCHW",  # input
-            "uint8", (0, 256), (8, 3, 3, 3), "OIHW",  # kernel
+            "uint8", (0, 256), (16, 3, 3, 3), "OIHW",  # kernel
             "int32", (-1e4, 1e4),  # bias
             "uint8",   # output
             {
-                "input_scale": relay.const(2 / 255),
+                "input_scale": relay.const(4 / 255),
                 "input_zero_point": relay.const(128),
                 "kernel_scale": relay.const(1 / 255),
                 "kernel_zero_point": relay.const(128),
-                "output_scale": relay.const(4 / 255),
-                "output_zero_point": relay.const(128),
+                "output_scale": relay.const(2 / 255),
+                "output_zero_point": relay.const(0),  # fused ReLU.
             },  # qnn params,
             (1, 1), (1, 1, 1, 1), (1, 1), 1,  # normal
         ),
         (
             "uint8", (0, 256), (1, 3, 128, 128), "NCHW",  # input
-            "int8", (-128, 128), (8, 3, 3, 3), "OIHW",  # kernel
+            "uint8", (0, 256), (16, 3, 5, 5), "OIHW",  # kernel
+            "int32", (0, 1e4),  # bias
+            "uint8",   # output
+            {
+                "input_scale": relay.const(4 / 255),
+                "input_zero_point": relay.const(128),
+                "kernel_scale": relay.const(1 / 255),
+                "kernel_zero_point": relay.const(128),
+                "output_scale": relay.const(2 / 255),
+                "output_zero_point": relay.const(0),  # fused ReLU.
+            },  # qnn params,
+            (2, 2), (2, 2, 2, 2), (1, 1), 1,  # strided: 2
+        ),
+        (
+            "uint8", (0, 256), (1, 3, 128, 128), "NCHW",  # input
+            "int8", (-128, 128), (16, 3, 3, 3), "OIHW",  # kernel
             "int32", (-1e4, 1e4),  # bias
             "uint8",   # output
             {
@@ -134,7 +149,7 @@ def _get_kernel_info(kernel_shape: Sequence[int], kernel_layout: str) -> Tuple[S
                 "input_zero_point": relay.const(128),
                 "kernel_scale": relay.const(1 / 127),
                 "kernel_zero_point": relay.const(0),
-                "output_scale": relay.const(4 / 255),
+                "output_scale": relay.const(1 / 255),
                 "output_zero_point": relay.const(128),
             },  # qnn params,
             (1, 1), (1, 1, 1, 1), (1, 1), 1,  # normal
@@ -154,8 +169,8 @@ def _get_kernel_info(kernel_shape: Sequence[int], kernel_layout: str) -> Tuple[S
         #             4 / 127,
         #         ]),
         #         "kernel_zero_point": relay.const(0),
-        #         "output_scale": relay.const(12 / 255),
-        #         "output_zero_point": relay.const(128),
+        #         "output_scale": relay.const(2 / 255),
+        #         "output_zero_point": relay.const(0),
         #     },  # qnn params (per-channel),
         #     (1, 1), (1, 1, 1, 1), (1, 1), 1,  # normal
         # )
