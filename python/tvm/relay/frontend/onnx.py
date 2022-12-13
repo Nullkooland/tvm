@@ -4162,15 +4162,19 @@ class DequantizeLinear(OnnxOpConverter):
     @classmethod
     def _impl_v10(cls, inputs, attr, params):
         data, scale, zp = inputs
-        return _qnn.op.dequantize(data, scale, _op.cast(zp, "int32"), 0)
+        scale = get_scalar(scale, params, dtype="float32")
+        zp = get_scalar(zp, params, dtype="int32")
+        return _qnn.op.dequantize(data, scale, zp, 0)
 
     @classmethod
     def _impl_v13(cls, inputs, attr, params):
         data, scale, zp = inputs
+        scale = get_scalar(scale, params, dtype="float32")
+        zp = get_scalar(zp, params, dtype="int32")
         axis = attr.get("axis", 1)
         if len(infer_shape(data)) <= 1:
             axis = 0
-        return _qnn.op.dequantize(data, scale, _op.cast(zp, "int32"), axis)
+        return _qnn.op.dequantize(data, scale, zp, axis)
 
 
 class DynamicQuantizeLinear(OnnxOpConverter):
