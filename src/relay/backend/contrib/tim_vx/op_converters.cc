@@ -1246,7 +1246,9 @@ const TimVxOpConverter::Memo TimVxOpConverter::GetMemo() {
 
   memo.emplace("argmin", std::make_unique<UnaryOpConverter<ops::ArgMin>>());
   memo.emplace("argmax", std::make_unique<UnaryOpConverter<ops::ArgMax>>());
-  memo.emplace("topk", std::make_unique<UnaryOpConverter<ops::Topk>>());
+  memo.emplace(
+      "topk",
+      std::make_unique<QnnWrapper<UnaryOpConverter<ops::Topk>, OpQuantFormat::TRANSPARENT>>());
 
   /* Neighborhood ops. */
   memo.emplace(
