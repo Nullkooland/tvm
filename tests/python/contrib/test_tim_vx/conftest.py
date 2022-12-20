@@ -15,14 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""Session scoped fixtures for TIM-VX tests."""
+"""Package scoped fixtures for TIM-VX tests."""
 
 from tvm import rpc
 import pytest
 import os
 
 
-@pytest.fixture(scope="session", name="remote")
+@pytest.fixture(scope="package", name="remote")
 def get_remote() -> rpc.RPCSession:
     """Get a remote RPC session for testing.
 
