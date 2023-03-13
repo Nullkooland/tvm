@@ -2017,23 +2017,6 @@ class Slice(OnnxOpConverter):
         )
 
 
-def normalize_gather_indices(data, indices, axis):
-    """Make sure gather indices aren't negative"""
-    ind_dtype = infer_type(indices).checked_type.dtype
-    # Normalize the indices to a positive range
-    s = _op.take(_op.shape_of(data, dtype=ind_dtype), _op.const(axis, dtype="int64"))
-    cond = fold_constant(indices < _op.const(0, ind_dtype))
-    if isinstance(cond, _expr.Constant):
-        val = cond.data.numpy()
-        if val.size == 1:
-            cond = val.item()
-            if cond:
-                indices = indices + s
-            return indices
-    indices = _op.where(cond, indices + s, indices)
-    return indices
-
-
 class Gather(OnnxOpConverter):
     """Operator converter for Gather."""
 
@@ -2042,7 +2025,6 @@ class Gather(OnnxOpConverter):
         axis = attr.get("axis", 0)
         data = inputs[0]
         indices = inputs[1]
-        indices = normalize_gather_indices(data, indices, axis)
         return _op.take(data, indices, axis)
 
 
@@ -2054,7 +2036,6 @@ class GatherElements(OnnxOpConverter):
         data = inputs[0]
         indices = inputs[1]
         axis = attr.get("axis", 0)
-        indices = normalize_gather_indices(data, indices, axis)
         return _op.gather(data, axis, indices)
 
 
@@ -5087,7 +5068,6 @@ class NegativeLogLikelihoodLoss(OnnxOpConverter):
         """
         # Convert negative indices --> positive indices for gather ops, note we have to
         # use the original target tensor to interact with ignore_index to have proper behavior.
-        normalized_target_tensor = normalize_gather_indices(input_tensor, target_tensor, 1)
 
         if weight_tensor is None:
             channels = infer_shape(input_tensor)[1]
@@ -5099,15 +5079,15 @@ class NegativeLogLikelihoodLoss(OnnxOpConverter):
         loss = -relay.gather(
             input_tensor,
             axis=1,
-            indices=relay.expand_dims(normalized_target_tensor, 1),
+            indices=relay.expand_dims(target_tensor, 1),
         )
         loss = relay.squeeze(loss, axis=[1])
 
-        expanded_normalized_target_tensor = relay.expand_dims(normalized_target_tensor, 0)
-        expanded_normalized_target_tensor = relay.nn.batch_flatten(
-            expanded_normalized_target_tensor
+        expanded_target_tensor = relay.expand_dims(target_tensor, 0)
+        expanded_target_tensor = relay.nn.batch_flatten(
+            expanded_target_tensor
         )
-        flattened_weights = relay.gather_nd(weight_tensor, expanded_normalized_target_tensor)
+        flattened_weights = relay.gather_nd(weight_tensor, expanded_target_tensor)
         select_weights = relay.reshape_like(flattened_weights, loss)
         loss *= select_weights
 
