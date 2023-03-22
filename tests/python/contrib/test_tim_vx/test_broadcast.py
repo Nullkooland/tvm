@@ -70,5 +70,46 @@ def test_broadcast(
     verify(tim_vx_outputs, ref_outputs, 0, 0)
 
 
+@tvm.testing.requires_tim_vx
+@pytest.mark.usefixtures("remote")
+@pytest.mark.parametrize(
+    ("dtype", "val_range", "shape", "repeats"),
+    [
+        ("float32", (0.0, 1.0), (1, 32), (16, 1)),
+        ("uint8", (0, 256), (1, 16, 1, 1), (1, 1, 40, 40)),
+        ("uint8", (0, 256), (18,), (200,)),
+        ("uint8", (0, 256), (1, 16, 16), (1, 30, 40)),
+        ("int32", (0, 10000), (1, 4, 8), (1, 16, 8)),
+    ]
+)
+def test_tile(
+    dtype: str,
+    val_range: ValueRange,
+    shape: Tuple[int, ...],
+    repeats: Tuple[int, ...],
+    remote: rpc.RPCSession
+):
+    inputs: Dict[str, tvm.nd.NDArray] = {
+        "input": tvm.nd.array(
+            np.random.uniform(*val_range, size=shape).astype(dtype)
+        ),
+    }
+    data = relay.var("input", shape=shape, dtype=dtype)
+    call = relay.tile(data, repeats)
+
+    tim_vx_outputs = build_and_run(
+        call,
+        inputs,
+        params={},
+        build_for_tim_vx=True,
+        expected_num_cpu_ops=0,
+        expected_num_tim_vx_subgraphs=1,
+        remote=remote
+    )
+
+    ref_outputs = build_and_run(call, inputs, build_for_tim_vx=False)
+    verify(tim_vx_outputs, ref_outputs, 0, 0)
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

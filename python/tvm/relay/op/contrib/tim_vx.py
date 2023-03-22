@@ -732,6 +732,7 @@ _register_external_op_helper("qnn.concatenate")
 _register_external_op_helper("split")
 _register_external_op_helper("strided_slice")
 _register_external_op_helper("broadcast_to")
+_register_external_op_helper("tile")
 
 # Gather-Scatter ops.
 _register_external_op_helper("where")

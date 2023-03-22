@@ -365,6 +365,26 @@ class UnaryOpConverter<ops::Broadcast> final : public TimVxOpConverter {
 };
 
 /*!
+ * \brief Converter class (fully specialized template) for tile op.
+ * \note Op format: tile(input) -> output.
+ */
+template <>
+class UnaryOpConverter<ops::Tile> final : public TimVxOpConverter {
+ public:
+  TimVxOp Convert(TimVxGraph graph, const CallNode* call, TimVxTensorSpecList& in_tensor_specs,
+                  TimVxTensorSpecList& out_tensor_specs) override {
+    const auto* attrs = call->attrs.as<TileAttrs>();
+    auto repeats = ConvertShape(attrs->reps);
+    auto repeats_ = std::vector<int>(repeats.size());
+    for (size_t i = 0; i < repeats.size(); i++) {
+      repeats_[i] = static_cast<int>(repeats[i]);
+    }
+
+    return graph->CreateOperation<ops::Tile>(repeats_);
+  }
+};
+
+/*!
  * \brief Converter class (fully specialized template) for sum op.
  * \note Op format: sum(input) -> output.
  */
@@ -1337,6 +1357,10 @@ const TimVxOpConverter::Memo TimVxOpConverter::GetMemo() {
   memo.emplace(
       "broadcast_to",
       std::make_unique<QnnWrapper<UnaryOpConverter<ops::Broadcast>, OpQuantFormat::TRANSPARENT>>());
+
+  memo.emplace(
+      "tile",
+      std::make_unique<QnnWrapper<UnaryOpConverter<ops::Tile>, OpQuantFormat::TRANSPARENT>>());
 
   /* Gather-Scatter ops. */
   memo.emplace("where", std::make_unique<WhereConverter>());
