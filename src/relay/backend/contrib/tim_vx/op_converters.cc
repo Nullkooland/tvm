@@ -203,6 +203,23 @@ class UnaryOpConverter<ops::LeakyRelu> final : public TimVxOpConverter {
 };
 
 /*!
+ * \brief Converter class (fully specialized template) for nn.softmax op.
+ * \note Op format: nn.softmax(input) -> output.
+ */
+template <>
+class UnaryOpConverter<ops::Softmax> final : public TimVxOpConverter {
+ public:
+  TimVxOp Convert(TimVxGraph graph, const CallNode* call, TimVxTensorSpecList& in_tensor_specs,
+                  TimVxTensorSpecList& out_tensor_specs) override {
+    const auto* attrs = call->attrs.as<SoftmaxAttrs>();
+    uint32_t rank = in_tensor_specs[0]->shape_.size();
+    int vx_axis = ConvertAxis<int>(attrs->axis, rank);
+
+    return graph->CreateOperation<ops::Softmax>(1.0F, vx_axis);
+  }
+};
+
+/*!
  * \brief Converter class (fully specialized template) for clip op.
  * \note Op format: clip(input) -> output.
  */
@@ -1145,6 +1162,10 @@ const TimVxOpConverter::Memo TimVxOpConverter::GetMemo() {
   memo.emplace(
       "qnn.hardswish",
       std::make_unique<QnnWrapper<UnaryOpConverter<ops::HardSwish>, OpQuantFormat::EXPLICIT>>());
+
+  memo.emplace("nn.softmax", std::make_unique<UnaryOpConverter<ops::Softmax>>());
+  memo.emplace("qnn.softmax",
+               std::make_unique<QnnWrapper<UnaryOpConverter<ops::Softmax>, OpQuantFormat::QDQ>>());
 
   memo.emplace("erf", std::make_unique<UnaryOpConverter<ops::Erf>>());
   memo.emplace("qnn.erf",

@@ -452,5 +452,76 @@ def test_swish(
     verify(tim_vx_outputs, ref_outputs, atol, rtol)
 
 
+@tvm.testing.requires_tim_vx
+@pytest.mark.usefixtures("remote")
+@pytest.mark.parametrize(
+    ("dtype", "val_range", "shape", "qnn_params", "axis"),
+    [
+        ("float32", (-1e3, 1e3), (256,), {}, 0),
+        ("float32", (-1e3, 1e3), (1, 32, 64), {}, 1),
+        ("uint8", (0, 256), (1024,), {
+            "input_scale": relay.const(64 / 255),
+            "input_zero_point": relay.const(128),
+            "output_scale": relay.const(1 / 255),
+            "output_zero_point": relay.const(0),
+        }, 0),
+        ("uint8", (0, 256), (1, 16, 4, 6300), {
+            "input_scale": relay.const(51 / 255),
+            "input_zero_point": relay.const(180),
+            "output_scale": relay.const(1 / 255),
+            "output_zero_point": relay.const(0),
+        }, 1),
+    ],
+)
+def test_softmax(
+    dtype: str,
+    val_range: ValueRange,
+    shape: Tuple[int, ...],
+    qnn_params: Dict[str, relay.Constant],
+    axis: int,
+    remote: rpc.RPCSession,
+):
+    inputs: Dict[str, tvm.nd.NDArray] = {
+        "input": tvm.nd.array(
+            np.random.uniform(*val_range, size=shape).astype(dtype)
+        ),
+    }
+    data = relay.var(
+        "input",
+        shape=shape,
+        dtype=dtype
+    )
+
+    if qnn_params:
+        call = relay.qnn.op.dequantize(
+            data=data,
+            input_scale=qnn_params["input_scale"],
+            input_zero_point=qnn_params["input_zero_point"]
+        )
+        call = relay.nn.softmax(call, axis=axis)
+        call = relay.qnn.op.quantize(
+            data=call,
+            output_scale=qnn_params["output_scale"],
+            output_zero_point=qnn_params["output_zero_point"]
+        )
+    else:
+        call = relay.nn.softmax(data, axis=axis)
+
+    tim_vx_outputs = build_and_run(
+        call,
+        inputs,
+        params={},
+        build_for_tim_vx=True,
+        expected_num_cpu_ops=0,
+        expected_num_tim_vx_subgraphs=1,
+        remote=remote
+    )
+
+    ref_outputs = build_and_run(call, inputs, build_for_tim_vx=False)
+
+    atol, rtol = (1, 1.0 / np.iinfo(dtype).max) if qnn_params else (1e-6, 1e-6)
+    verify(tim_vx_outputs, ref_outputs, atol, rtol)
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

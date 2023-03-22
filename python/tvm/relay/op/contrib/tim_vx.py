@@ -564,6 +564,13 @@ def tim_vx_pattern_table():
         sigmoid = is_op("sigmoid")(x)
         return x * sigmoid
 
+    def qnn_softmax_pattern():
+        data = wildcard()
+        pattern = is_op("qnn.dequantize")(data, is_constant(), is_constant())
+        pattern = is_op("nn.softmax")(pattern)
+        pattern = is_op("qnn.quantize")(pattern, is_constant(), is_constant())
+        return pattern
+
     def qnn_avg_pool2d_pattern():
         data = wildcard()
         pattern = is_op("cast")(data).has_attr(
@@ -626,6 +633,7 @@ def tim_vx_pattern_table():
          space_to_depth_2x2_pattern(), check_space_to_depth_2x2),
         ("tim_vx.nn.swish", nn_swish_pattern()),
         ("tim_vx.qnn.swish", qnn_swish_pattern()),
+        ("tim_vx.qnn.softmax", qnn_softmax_pattern()),
         ("tim_vx.qnn.avg_pool2d", qnn_avg_pool2d_pattern()),
         ("tim_vx.qnn.sum", qnn_sum_pattern()),
         ("tim_vx.qnn.prod", qnn_prod_pattern()),
@@ -654,6 +662,7 @@ _register_external_op_helper("qnn.tanh")
 _register_external_op_helper("qnn.hardswish")
 _register_external_op_helper("erf")
 _register_external_op_helper("qnn.erf")
+_register_external_op_helper("nn.softmax")
 
 # Elementwise unary ops.
 _register_external_op_helper("negative")
