@@ -851,12 +851,16 @@ class QnnWrapper<UnaryOpConverter<TOp>, OpQuantFormat::I32_CAST> final : public 
     const CallNode* i32_op = nullptr;
 
     if (backend::IsOp(inner_call, "qnn.requantize")) {
+      const auto* requantize = inner_call;
       // Skip output requantize op.
       inner_call = inner_call->args[0].as<CallNode>();
       i32_op = inner_call;
       // Skip i32 op.
       inner_call = inner_call->args[0].as<CallNode>();
-      const auto* requantize = inner_call;
+      if (backend::IsOp(inner_call, "qnn.requantize")) {
+        // Use input requantize op if exits.
+        requantize = inner_call;
+      }
 
       const auto* requantize_attrs = requantize->attrs.as<qnn::RequantizeAttrs>();
       uint32_t rank = in_tensor_specs[0]->shape_.size();

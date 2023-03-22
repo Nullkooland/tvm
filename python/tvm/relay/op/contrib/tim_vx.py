@@ -569,8 +569,7 @@ def tim_vx_pattern_table():
         pattern = is_op("cast")(data).has_attr(
             {"dtype": "int32"})  # type: ignore
         pattern = is_op("nn.avg_pool2d")(pattern)
-        pattern = is_op("cast")(pattern)
-        pattern = pattern | is_op("qnn.requantize")(
+        pattern = is_op("cast")(pattern) | is_op("qnn.requantize")(
             pattern, is_constant(), is_constant(), is_constant(), is_constant()
         )
         return pattern
