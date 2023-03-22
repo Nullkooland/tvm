@@ -349,6 +349,22 @@ class UnaryOpConverter<ops::Split> final : public TimVxOpConverter {
 };
 
 /*!
+ * \brief Converter class (fully specialized template) for broadcast_to op.
+ * \note Op format: broadcast_to(input) -> output.
+ */
+template <>
+class UnaryOpConverter<ops::Broadcast> final : public TimVxOpConverter {
+ public:
+  TimVxOp Convert(TimVxGraph graph, const CallNode* call, TimVxTensorSpecList& in_tensor_specs,
+                  TimVxTensorSpecList& out_tensor_specs) override {
+    const auto* attrs = call->attrs.as<InitOpAttrs>();
+    auto shape = ConvertShape(attrs->shape.value());
+
+    return graph->CreateOperation<ops::Broadcast>(shape);
+  }
+};
+
+/*!
  * \brief Converter class (fully specialized template) for sum op.
  * \note Op format: sum(input) -> output.
  */
@@ -1317,6 +1333,10 @@ const TimVxOpConverter::Memo TimVxOpConverter::GetMemo() {
   memo.emplace(
       "split",
       std::make_unique<QnnWrapper<UnaryOpConverter<ops::Split>, OpQuantFormat::TRANSPARENT>>());
+
+  memo.emplace(
+      "broadcast_to",
+      std::make_unique<QnnWrapper<UnaryOpConverter<ops::Broadcast>, OpQuantFormat::TRANSPARENT>>());
 
   /* Gather-Scatter ops. */
   memo.emplace("where", std::make_unique<WhereConverter>());
