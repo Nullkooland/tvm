@@ -24,7 +24,6 @@
 #ifndef TVM_RUNTIME_CONTRIB_TIM_VX_TIM_VX_RUNTIME_H_
 #define TVM_RUNTIME_CONTRIB_TIM_VX_TIM_VX_RUNTIME_H_
 
-#include <tim/utils/nbg_parser.h>
 #include <tim/vx/context.h>
 #include <tim/vx/graph.h>
 #include <tim/vx/tensor.h>
@@ -40,6 +39,8 @@
 #include <mutex>
 #include <string>
 #include <vector>
+
+#include "nbg_parser.h"
 
 namespace tvm {
 namespace runtime {
@@ -87,37 +88,39 @@ class TimVxRuntime final : public ModuleNode {
   void Run();
 
   /*! \brief Convert NBG datatype to TIM-VX datatype. */
-  static inline tim::vx::DataType ConvertDataType(nbg_buffer_format_e data_type) {
+  static inline tim::vx::DataType ConvertDataType(NBGDataType data_type) {
     switch (data_type) {
-      case nbg_buffer_format_e::NBG_BUFFER_FORMAT_FP32:
+      case NBGDataType::FP32:
         return tim::vx::DataType::FLOAT32;
-      case nbg_buffer_format_e::NBG_BUFFER_FORMAT_FP16:
+      case NBGDataType::FP16:
         return tim::vx::DataType::FLOAT16;
-      case nbg_buffer_format_e::NBG_BUFFER_FORMAT_UINT8:
+      case NBGDataType::UINT8:
         return tim::vx::DataType::UINT8;
-      case nbg_buffer_format_e::NBG_BUFFER_FORMAT_UINT16:
+      case NBGDataType::UINT16:
         return tim::vx::DataType::UINT16;
-      case nbg_buffer_format_e::NBG_BUFFER_FORMAT_UINT32:
+      case NBGDataType::UINT32:
         return tim::vx::DataType::UINT32;
-      case nbg_buffer_format_e::NBG_BUFFER_FORMAT_INT8:
+      case NBGDataType::INT8:
         return tim::vx::DataType::INT8;
-      case nbg_buffer_format_e::NBG_BUFFER_FORMAT_INT16:
+      case NBGDataType::INT16:
         return tim::vx::DataType::INT16;
-      case nbg_buffer_format_e::NBG_BUFFER_FORMAT_INT32:
+      case NBGDataType::INT32:
         return tim::vx::DataType::INT32;
+      case NBGDataType::INT64:
+        return tim::vx::DataType::INT64;
       default:
         return tim::vx::DataType::UNKNOWN;
     }
   }
 
   /*! \brief Convert NBG quantization type to TIM-VX quantization type. */
-  static inline tim::vx::QuantType ConvertQuantType(nbg_buffer_quantize_format_e quant_type) {
+  static inline tim::vx::QuantType ConvertQuantType(NBGQuantType quant_type) {
     switch (quant_type) {
-      case nbg_buffer_quantize_format_e::NBG_BUFFER_QUANTIZE_NONE:
+      case NBGQuantType::NONE:
         return tim::vx::QuantType::NONE;
-      case nbg_buffer_quantize_format_e::NBG_BUFFER_QUANTIZE_AFFINE_ASYMMETRIC:
+      case NBGQuantType::AFFINE_ASYMMETRIC:
         return tim::vx::QuantType::ASYMMETRIC;
-      case nbg_buffer_quantize_format_e::NBG_BUFFER_QUANTIZE_DYNAMIC_FIXED_POINT:
+      case NBGQuantType::DYNAMIC_FIXED_POINT:
         return tim::vx::QuantType::DYNAMIC_FIXED_POINT;
       default:
         return tim::vx::QuantType::NONE;

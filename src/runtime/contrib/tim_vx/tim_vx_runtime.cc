@@ -24,10 +24,11 @@
 
 #include "tim_vx_runtime.h"
 
-#include <tim/utils/nbg_parser.h>
 #include <tim/vx/ops/nbg.h>
 
 #include <fstream>
+
+#include "nbg_parser.h"
 
 namespace tvm {
 namespace runtime {
@@ -45,7 +46,8 @@ PackedFunc TimVxRuntime::GetFunction(const std::string& name,
                                      const ObjectPtr<Object>& sptr_to_self) {
   if (name == "get_symbol") {
     return PackedFunc([sptr_to_self, this](TVMArgs args, TVMRetValue* rv) { *rv = symbol_name_; });
-  } else if (name == symbol_name_) {
+  }
+  if (name == symbol_name_) {
     return PackedFunc([sptr_to_self, this](TVMArgs args, TVMRetValue* rv) {
       // Initialize the subgraph.
       std::call_once(
@@ -53,24 +55,16 @@ PackedFunc TimVxRuntime::GetFunction(const std::string& name,
       // Execute the subgraph.
       this->Run();
     });
-  } else {
-    // LOG(WARNING) << "Function: " << name << " not implemented";
-    return PackedFunc(nullptr);
   }
+  // LOG(WARNING) << "Function: " << name << " not implemented";
+  return PackedFunc(nullptr);
 }
 
 void TimVxRuntime::Init(const TVMArgs& args) {
-  nbg_parser_data parser;
-  ICHECK(nbg_parser_init(nbg_buffer_.data(), nbg_buffer_.size(), &parser) ==
-         nbg_status_e::NBG_SUCCESS)
-      << "Failed to initialize NBG parser";
+  NBGParser parser(nbg_buffer_.data(), nbg_buffer_.size());
 
-  uint32_t num_inputs;
-  uint32_t num_outputs;
-  nbg_parser_query_network(parser, nbg_network_property_e::NBG_PARSER_NETWORK_INPUT_COUNT,
-                           &num_inputs, sizeof(num_inputs));
-  nbg_parser_query_network(parser, nbg_network_property_e::NBG_PARSER_NETWORK_OUTPUT_COUNT,
-                           &num_outputs, sizeof(num_outputs));
+  size_t num_inputs = parser.QueryNetworkNumInputs();
+  size_t num_outputs = parser.QueryNetworkNumOutputs();
 
   ICHECK_EQ(args.size(), num_inputs + num_outputs)
       << "Number of passed args is mismatched with the NBG input/output tensors.";
@@ -80,7 +74,7 @@ void TimVxRuntime::Init(const TVMArgs& args) {
 
   // Parse input tensor specs.
   input_tensors_.reserve(num_inputs);
-  for (uint32_t i = 0; i < num_inputs; i++) {
+  for (size_t i = 0; i < num_inputs; i++) {
     auto arg = args[i];
     NDArray nd_array;
     if (arg.type_code() == TVMArgTypeCode::kTVMDLTensorHandle) {
@@ -92,55 +86,34 @@ void TimVxRuntime::Init(const TVMArgs& args) {
     }
 
     // Query buffer type.
-    nbg_buffer_type_e buffer_type;
-    nbg_parser_query_input(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_DATA_TYPE,
-                           &buffer_type, sizeof(buffer_type));
-    ICHECK(buffer_type == nbg_buffer_type_e::NBG_BUFFER_TYPE_TENSOR)
-        << "Only supports TIM-VX tensor as input";
+    auto buffer_type = parser.QueryInputBufferType(i);
+    ICHECK_EQ(buffer_type, NBGBufferType::TENSOR) << "Only supports  tensor as input";
 
     // Query data type.
-    nbg_buffer_format_e nbg_data_type;
-    nbg_parser_query_input(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_DATA_FORMAT,
-                           &nbg_data_type, sizeof(nbg_data_type));
+    auto nbg_data_type = parser.QueryInputDataType(i);
 
     auto vx_data_type = ConvertDataType(nbg_data_type);
     ICHECK(vx_data_type != tim::vx::DataType::UNKNOWN)
-        << "Unsupported NBG data type: " << nbg_data_type;
+        << "Unsupported NBG data type: " << static_cast<int>(nbg_data_type);
 
     // Query shape.
-    uint32_t num_dims;
-    nbg_parser_query_input(parser, i,
-                           nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_NUM_OF_DIMENSION,
-                           &num_dims, sizeof(num_dims));
-
+    size_t num_dims = parser.QueryInputNumDims(i);
+    auto dims = parser.QueryInputDims(i);
     auto shape = tim::vx::ShapeType(num_dims);
-    nbg_parser_query_input(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_DIMENSIONS,
-                           shape.data(), shape.size() * sizeof(tim::vx::ShapeType::value_type));
+    std::copy_n(dims.cbegin(), num_dims, shape.begin());
 
     auto spec = tim::vx::TensorSpec(vx_data_type, shape, tim::vx::TensorAttribute::INPUT);
 
     // Query quantization info.
-    nbg_buffer_quantize_format_e nbg_quant_type;
-    nbg_parser_query_input(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_QUANT_FORMAT,
-                           &nbg_quant_type, sizeof(nbg_quant_type));
-
+    auto nbg_quant_type = parser.QueryInputQuantType(i);
     auto vx_quant_type = ConvertQuantType(nbg_quant_type);
     if (vx_quant_type == tim::vx::QuantType::ASYMMETRIC) {
-      float scale;
-      int zero_point;
-      nbg_parser_query_input(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_SCALE, &scale,
-                             sizeof(scale));
-      nbg_parser_query_input(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_ZERO_POINT,
-                             &zero_point, sizeof(zero_point));
-
+      float scale = parser.QueryInputQuantScale(i);
+      int zero_point = parser.QueryInputQuantZeroPoint(i);
       auto quant_info = tim::vx::Quantization(vx_quant_type, scale, zero_point);
       spec.SetQuantization(quant_info);
     } else if (vx_quant_type == tim::vx::QuantType::DYNAMIC_FIXED_POINT) {
-      int fl;
-      nbg_parser_query_input(parser, i,
-                             nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_FIXED_POINT_POS, &fl,
-                             sizeof(fl));
-
+      int fl = parser.QueryInputQuantDfpPos(i);
       auto quant_info = tim::vx::Quantization(vx_quant_type, static_cast<int8_t>(fl));
       spec.SetQuantization(quant_info);
     }
@@ -155,7 +128,7 @@ void TimVxRuntime::Init(const TVMArgs& args) {
 
   // Parse output tensor specs.
   output_tensors_.reserve(num_outputs);
-  for (uint32_t i = 0; i < num_outputs; i++) {
+  for (size_t i = 0; i < num_outputs; i++) {
     auto arg = args[num_inputs + i];
     NDArray nd_array;
     if (arg.type_code() == TVMArgTypeCode::kTVMDLTensorHandle) {
@@ -167,55 +140,34 @@ void TimVxRuntime::Init(const TVMArgs& args) {
     }
 
     // Query buffer type.
-    nbg_buffer_type_e buffer_type;
-    nbg_parser_query_output(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_DATA_TYPE,
-                            &buffer_type, sizeof(buffer_type));
-    ICHECK(buffer_type == nbg_buffer_type_e::NBG_BUFFER_TYPE_TENSOR)
-        << "Only supports TIM-VX tensor as output";
+    auto buffer_type = parser.QueryOutputBufferType(i);
+    ICHECK_EQ(buffer_type, NBGBufferType::TENSOR) << "Only supports  tensor as output";
 
     // Query data type.
-    nbg_buffer_format_e nbg_data_type;
-    nbg_parser_query_output(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_DATA_FORMAT,
-                            &nbg_data_type, sizeof(nbg_data_type));
+    auto nbg_data_type = parser.QueryOutputDataType(i);
 
     auto vx_data_type = ConvertDataType(nbg_data_type);
     ICHECK(vx_data_type != tim::vx::DataType::UNKNOWN)
-        << "Unsupported NBG data type: " << nbg_data_type;
+        << "Unsupported NBG data type: " << static_cast<int>(nbg_data_type);
 
     // Query shape.
-    uint32_t num_dims;
-    nbg_parser_query_output(parser, i,
-                            nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_NUM_OF_DIMENSION,
-                            &num_dims, sizeof(num_dims));
-
+    size_t num_dims = parser.QueryOutputNumDims(i);
+    auto dims = parser.QueryOutputDims(i);
     auto shape = tim::vx::ShapeType(num_dims);
-    nbg_parser_query_output(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_DIMENSIONS,
-                            shape.data(), shape.size() * sizeof(tim::vx::ShapeType::value_type));
+    std::copy_n(dims.cbegin(), num_dims, shape.begin());
 
     auto spec = tim::vx::TensorSpec(vx_data_type, shape, tim::vx::TensorAttribute::OUTPUT);
 
     // Query quantization info.
-    nbg_buffer_quantize_format_e nbg_quant_type;
-    nbg_parser_query_output(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_QUANT_FORMAT,
-                            &nbg_quant_type, sizeof(nbg_quant_type));
-
+    auto nbg_quant_type = parser.QueryOutputQuantType(i);
     auto vx_quant_type = ConvertQuantType(nbg_quant_type);
     if (vx_quant_type == tim::vx::QuantType::ASYMMETRIC) {
-      float scale;
-      int zero_point;
-      nbg_parser_query_output(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_SCALE,
-                              &scale, sizeof(scale));
-      nbg_parser_query_output(parser, i, nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_ZERO_POINT,
-                              &zero_point, sizeof(zero_point));
-
+      float scale = parser.QueryOutputQuantScale(i);
+      int zero_point = parser.QueryOutputQuantZeroPoint(i);
       auto quant_info = tim::vx::Quantization(vx_quant_type, scale, zero_point);
       spec.SetQuantization(quant_info);
     } else if (vx_quant_type == tim::vx::QuantType::DYNAMIC_FIXED_POINT) {
-      int fl;
-      nbg_parser_query_output(parser, i,
-                              nbg_buffer_property_e::NBG_PARSER_BUFFER_PROP_FIXED_POINT_POS, &fl,
-                              sizeof(fl));
-
+      int fl = parser.QueryOutputQuantDfpPos(i);
       auto quant_info = tim::vx::Quantization(vx_quant_type, static_cast<int8_t>(fl));
       spec.SetQuantization(quant_info);
     }
@@ -227,7 +179,6 @@ void TimVxRuntime::Init(const TVMArgs& args) {
       output_tensors_.push_back(graph_->CreateTensor(spec, dma_buf));
     }
   }
-  nbg_parser_destroy(parser);
 
   // Create NBG node.
   auto nbg_node =
