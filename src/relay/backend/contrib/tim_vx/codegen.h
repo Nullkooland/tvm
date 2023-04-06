@@ -145,7 +145,7 @@ TVM_REGISTER_GLOBAL("relay.ext.tim_vx.constant_updater")
  * \return True if TIM-VX runtime is enabled, False if not.
  */
 inline constexpr bool IsTimVxRuntimeEnabled() {
-#if TVM_GRAPH_EXECUTOR_TIM_VX | TVM_GRAPH_EXECUTOR_OPENVX
+#if TVM_GRAPH_EXECUTOR_TIM_VX || TVM_GRAPH_EXECUTOR_OPENVX
   return true;
 #else
   return false;
