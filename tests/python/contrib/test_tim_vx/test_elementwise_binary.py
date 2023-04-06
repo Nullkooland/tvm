@@ -253,10 +253,10 @@ def test_logical(
 ):
     inputs: Dict[str, tvm.nd.NDArray] = {
         "lhs": tvm.nd.array(
-            np.random.randint(0, 2, size=lhs_shape).astype(np.bool8)
+            np.random.randint(0, 2, size=lhs_shape).astype(np.bool_)
         ),
         "rhs": tvm.nd.array(
-            np.random.uniform(0, 2, size=rhs_shape).astype(np.bool8)
+            np.random.uniform(0, 2, size=rhs_shape).astype(np.bool_)
         ),
     }
     lhs = relay.var("lhs", shape=lhs_shape, dtype="bool")

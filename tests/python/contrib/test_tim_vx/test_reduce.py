@@ -290,7 +290,7 @@ def test_logical(
 ):
     inputs: Dict[str, tvm.nd.NDArray] = {
         "input": tvm.nd.array(
-            np.random.randint(0, 2, size=shape).astype(np.bool8)
+            np.random.randint(0, 2, size=shape).astype(np.bool_)
         ),
     }
     data = relay.var("input", shape=shape, dtype="bool")
