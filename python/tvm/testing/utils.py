@@ -984,7 +984,7 @@ requires_vitis_ai = Feature("vitis_ai", "Vitis AI", cmake_flag="USE_VITIS_AI")
 requires_tim_vx = Feature(
     "tim_vx",
     "TIM-VX",
-    cmake_flag="USE_TIM_VX",
+    cmake_flag="USE_TIM_VX_CODEGEN",
     parent_features="llvm"
 )
 

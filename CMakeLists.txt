@@ -114,8 +114,10 @@ tvm_option(SUMMARIZE "Print CMake option summary after configuring" OFF)
 tvm_option(USE_CLML "Build with CLML Codegen support" OFF)
 tvm_option(USE_CLML_GRAPH_EXECUTOR "Build with CLML graph runtime" OFF)
 tvm_option(USE_UMA "Build with UMA support" OFF)
-tvm_option(USE_TIM_VX "Build with TIM-VX support" OFF)
-tvm_option(USE_TIM_VX_VIPLITE_RUNTIME "Build with VIPLite runtime support for TIM-VX" OFF)
+tvm_option(USE_TIM_VX_CODEGEN "Build with TIM-VX codegen" OFF)
+tvm_option(USE_TIM_VX_RUNTIME "Build with TIM-VX runtime" OFF)
+tvm_option(USE_OPENVX_RUNTIME "Build with OpenVX runtime" OFF)
+tvm_option(USE_VIPLITE_RUNTIME "Build with VIPLite runtime" OFF)
 
 # include directories
 include_directories(${CMAKE_INCLUDE_PATH})

@@ -331,10 +331,14 @@ set(USE_TARGET_ONNX OFF)
 # Whether enable BNNS runtime
 set(USE_BNNS OFF)
 
-# Whether to use TIM-VX codegen and runtime
-set(USE_TIM_VX OFF)
+# Whether to use TIM-VX codegen
+set(USE_TIM_VX_CODEGEN OFF)
+# Whether to use TIM-VX runtime to execute NBG compiled by TIM-VX codegen
+set(USE_TIM_VX_RUNTIME OFF)
+# Whether to use OpenVX runtime to execute NBG compiled by TIM-VX codegen
+set(USE_OPENVX_RUNTIME OFF)
 # Whether to use VIPLite runtime to execute NBG compiled by TIM-VX codegen
-set(USE_TIM_VX_VIPLITE_RUNTIME OFF)
+set(USE_VIPLITE_RUNTIME OFF)
 
 # Whether to use libbacktrace
 # Libbacktrace provides line and column information on stack traces from errors.
